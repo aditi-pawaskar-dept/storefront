@@ -1,531 +1,351 @@
-// Drop-in Tools
-import { events } from '@dropins/tools/event-bus.js';
-
-import { tryRenderAemAssetsImage } from '@dropins/tools/lib/aem/assets.js';
-import { getMetadata } from '../../scripts/aem.js';
 import { loadFragment } from '../fragment/fragment.js';
-import { fetchPlaceholders, getProductLink, rootLink } from '../../scripts/commerce.js';
+import { getMetadata } from '../../scripts/aem.js';
+import createModal from '../modal/modal.js';
+import { checkPincode } from '../location-modal/postload.js';
 
-import renderAuthCombine from './renderAuthCombine.js';
-import { renderAuthDropdown } from './renderAuthDropdown.js';
-
-// media query match that indicates mobile/tablet width
 const isDesktop = window.matchMedia('(min-width: 900px)');
 
-const labels = await fetchPlaceholders();
-
-const overlay = document.createElement('div');
-overlay.classList.add('overlay');
-document.querySelector('header').insertAdjacentElement('afterbegin', overlay);
-
-function closeOnEscape(e) {
-  if (e.code === 'Escape') {
-    const nav = document.getElementById('nav');
-    const navSections = nav.querySelector('.nav-sections');
-    const navSectionExpanded = navSections.querySelector('[aria-expanded="true"]');
-    if (navSectionExpanded && isDesktop.matches) {
-      toggleAllNavSections(navSections);
-      overlay.classList.remove('show');
-      navSectionExpanded.focus();
-    } else if (!isDesktop.matches) {
-      toggleMenu(nav, navSections);
-      overlay.classList.remove('show');
-      nav.querySelector('button').focus();
-      const navWrapper = document.querySelector('.nav-wrapper');
-      navWrapper.classList.remove('active');
-    }
-  }
-}
-
-function closeOnFocusLost(e) {
-  const nav = e.currentTarget;
-  if (!nav.contains(e.relatedTarget)) {
-    const navSections = nav.querySelector('.nav-sections');
-    const navSectionExpanded = navSections.querySelector('[aria-expanded="true"]');
-    if (navSectionExpanded && isDesktop.matches) {
-      toggleAllNavSections(navSections, false);
-      overlay.classList.remove('show');
-    } else if (!isDesktop.matches) {
-      toggleMenu(nav, navSections, true);
-    }
-  }
-}
-
-function openOnKeydown(e) {
-  const focused = document.activeElement;
-  const isNavDrop = focused.className === 'nav-drop';
-  if (isNavDrop && (e.code === 'Enter' || e.code === 'Space')) {
-    const dropExpanded = focused.getAttribute('aria-expanded') === 'true';
-    toggleAllNavSections(focused.closest('.nav-sections'));
-    focused.setAttribute('aria-expanded', dropExpanded ? 'false' : 'true');
-  }
-}
-
-function focusNavSection() {
-  document.activeElement.addEventListener('keydown', openOnKeydown);
-}
-
-/**
- * Toggles all nav sections
- * @param {Element} sections The container element
- * @param {Boolean} expanded Whether the element should be expanded or collapsed
- */
-function toggleAllNavSections(sections, expanded = false) {
-  sections
-    .querySelectorAll('.nav-sections .default-content-wrapper > ul > li')
-    .forEach((section) => {
-      section.setAttribute('aria-expanded', expanded);
-    });
-}
-
-/**
- * Toggles the entire nav
- * @param {Element} nav The container element
- * @param {Element} navSections The nav sections within the container element
- * @param {*} forceExpanded Optional param to force nav expand behavior when not null
- */
-function toggleMenu(nav, navSections, forceExpanded = null) {
-  const expanded = forceExpanded !== null ? !forceExpanded : nav.getAttribute('aria-expanded') === 'true';
-  const button = nav.querySelector('.nav-hamburger button');
-  document.body.style.overflowY = expanded || isDesktop.matches ? '' : 'hidden';
-  nav.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-  toggleAllNavSections(navSections, expanded || isDesktop.matches ? 'false' : 'true');
-  button.setAttribute('aria-label', expanded ? 'Open navigation' : 'Close navigation');
-  // enable nav dropdown keyboard accessibility
-  const navDrops = navSections.querySelectorAll('.nav-drop');
-  if (isDesktop.matches) {
-    navDrops.forEach((drop) => {
-      if (!drop.hasAttribute('tabindex')) {
-        drop.setAttribute('tabindex', 0);
-        drop.addEventListener('focus', focusNavSection);
-      }
-    });
-  } else {
-    navDrops.forEach((drop) => {
-      drop.classList.remove('active');
-      drop.removeAttribute('tabindex');
-      drop.removeEventListener('focus', focusNavSection);
-    });
-  }
-
-  // enable menu collapse on escape keypress
-  if (!expanded || isDesktop.matches) {
-    // collapse menu on escape press
-    window.addEventListener('keydown', closeOnEscape);
-    // collapse menu on focus lost
-    nav.addEventListener('focusout', closeOnFocusLost);
-  } else {
-    window.removeEventListener('keydown', closeOnEscape);
-    nav.removeEventListener('focusout', closeOnFocusLost);
-  }
-}
-
-const subMenuHeader = document.createElement('div');
-subMenuHeader.classList.add('submenu-header');
-subMenuHeader.innerHTML = '<h5 class="back-link">All Categories</h5><hr />';
-
-/**
- * Sets up the submenu
- * @param {navSection} navSection The nav section element
- */
-function setupSubmenu(navSection) {
-  if (navSection.querySelector('ul')) {
-    let label;
-    if (navSection.childNodes.length) {
-      [label] = navSection.childNodes;
-    }
-
-    const submenu = navSection.querySelector('ul');
-    const wrapper = document.createElement('div');
-    const header = subMenuHeader.cloneNode(true);
-    const title = document.createElement('h6');
-    title.classList.add('submenu-title');
-    title.textContent = label.textContent;
-
-    wrapper.classList.add('submenu-wrapper');
-    wrapper.appendChild(header);
-    wrapper.appendChild(title);
-    wrapper.appendChild(submenu.cloneNode(true));
-
-    navSection.appendChild(wrapper);
-    navSection.removeChild(submenu);
-  }
-}
-
-/**
- * loads and decorates the header, mainly the nav
- * @param {Element} block The header block element
- */
 export default async function decorate(block) {
-  // load nav as fragment
   const navMeta = getMetadata('nav');
   const navPath = navMeta ? new URL(navMeta, window.location).pathname : '/nav';
   const fragment = await loadFragment(navPath);
+  console.log(fragment, "console.log(fragment.firstElementChild);");
 
-  // decorate nav DOM
-  block.textContent = '';
-  const nav = document.createElement('nav');
-  nav.id = 'nav';
-  while (fragment.firstElementChild) nav.append(fragment.firstElementChild);
+  let navContent = fragment;
+  let modal;
 
-  const classes = ['brand', 'sections', 'tools'];
-  classes.forEach((c, i) => {
-    const section = nav.children[i];
-    if (section) section.classList.add(`nav-${c}`);
-  });
+  const showModal = async (content) => {
+    modal = await createModal([content]);
+    modal.showModal();
+  };
 
-  const navBrand = nav.querySelector('.nav-brand');
-  const brandLink = navBrand.querySelector('.button');
-  if (brandLink) {
-    brandLink.className = '';
-    brandLink.closest('.button-container').className = '';
+  if (fragment.firstElementChild?.classList.contains('section')) {
+    navContent = fragment.firstElementChild.querySelector('.default-content-wrapper');
   }
 
-  const navSections = nav.querySelector('.nav-sections');
-  if (navSections) {
-    navSections
-      .querySelectorAll(':scope .default-content-wrapper > ul > li')
-      .forEach((navSection) => {
-        if (navSection.querySelector('ul')) navSection.classList.add('nav-drop');
-        setupSubmenu(navSection);
-        navSection.addEventListener('click', (event) => {
-          if (event.target.tagName === 'A') return;
-          if (!isDesktop.matches) {
-            navSection.classList.toggle('active');
-          }
-        });
-        navSection.addEventListener('mouseenter', () => {
-          toggleAllNavSections(navSections);
-          if (isDesktop.matches) {
-            if (!navSection.classList.contains('nav-drop')) {
-              overlay.classList.remove('show');
-              return;
-            }
-            navSection.setAttribute('aria-expanded', 'true');
-            overlay.classList.add('show');
-          }
-        });
-      });
-  }
+  const headerNewSection = fragment.querySelector('.header-new-container');
 
-  const navTools = nav.querySelector('.nav-tools');
+  block.append(navContent);
+  block.append(headerNewSection);
 
-  /** Wishlist */
-  const wishlist = document.createRange().createContextualFragment(`
-     <div class="wishlist-wrapper nav-tools-wrapper">
-       <button type="button" class="nav-wishlist-button" aria-label="Wishlist"></button>
-       <div class="wishlist-panel nav-tools-panel"></div>
-     </div>
-   `);
+  // 🔹 Now that header is appended, attach hover listeners
+  // attachHoverListeners();
 
-  navTools.append(wishlist);
-
-  const wishlistButton = navTools.querySelector('.nav-wishlist-button');
-
-  const wishlistMeta = getMetadata('wishlist');
-  const wishlistPath = wishlistMeta ? new URL(wishlistMeta, window.location).pathname : '/wishlist';
-
-  wishlistButton.addEventListener('click', () => {
-    window.location.href = rootLink(wishlistPath);
-  });
-
-  /** Mini Cart */
-  const excludeMiniCartFromPaths = ['/checkout'];
-
-  const minicart = document.createRange().createContextualFragment(`
-     <div class="minicart-wrapper nav-tools-wrapper">
-       <button type="button" class="nav-cart-button" aria-label="Cart"></button>
-       <div class="minicart-panel nav-tools-panel"></div>
-     </div>
-   `);
-
-  navTools.append(minicart);
-
-  const minicartPanel = navTools.querySelector('.minicart-panel');
-
-  const cartButton = navTools.querySelector('.nav-cart-button');
-
-  if (excludeMiniCartFromPaths.includes(window.location.pathname)) {
-    cartButton.style.display = 'none';
-  }
-
-  /**
-   * Handles loading states for navigation panels with state management
-   *
-   * @param {HTMLElement} panel - The panel element to manage loading state for
-   * @param {HTMLElement} button - The button that triggers the panel
-   * @param {Function} loader - Async function to execute during loading
-   */
-  async function withLoadingState(panel, button, loader) {
-    if (panel.dataset.loaded === 'true' || panel.dataset.loading === 'true') return;
-
-    button.setAttribute('aria-busy', 'true');
-    panel.dataset.loading = 'true';
-
-    try {
-      await loader();
-      panel.dataset.loaded = 'true';
-    } finally {
-      panel.dataset.loading = 'false';
-      button.removeAttribute('aria-busy');
-
-      // Execute pending toggle if exists
-      if (panel.dataset.pendingToggle === 'true') {
-        // eslint-disable-next-line no-nested-ternary
-        const pendingState = panel.dataset.pendingState === 'true' ? true : (panel.dataset.pendingState === 'false' ? false : undefined);
-
-        // Clear pending flags
-        panel.removeAttribute('data-pending-toggle');
-        panel.removeAttribute('data-pending-state');
-
-        // Execute the pending toggle
-        const show = pendingState ?? !panel.classList.contains('nav-tools-panel--show');
-        panel.classList.toggle('nav-tools-panel--show', show);
-      }
-    }
-  }
-
-  function togglePanel(panel, state) {
-    // If loading is in progress, queue the toggle action
-    if (panel.dataset.loading === 'true') {
-      // Store the pending toggle action
-      panel.dataset.pendingToggle = 'true';
-      panel.dataset.pendingState = state !== undefined ? state.toString() : '';
-      return;
-    }
-
-    const show = state ?? !panel.classList.contains('nav-tools-panel--show');
-    panel.classList.toggle('nav-tools-panel--show', show);
-  }
-
-  // Lazy loading for mini cart fragment
-  async function loadMiniCartFragment() {
-    await withLoadingState(minicartPanel, cartButton, async () => {
-      const miniCartMeta = getMetadata('mini-cart');
-      const miniCartPath = miniCartMeta ? new URL(miniCartMeta, window.location).pathname : '/mini-cart';
-      const miniCartFragment = await loadFragment(miniCartPath);
-      minicartPanel.append(miniCartFragment.firstElementChild);
+  const main = document.querySelector('main');
+  if (main) {
+    main.querySelectorAll('.section').forEach((section) => {
+      const wrapper = section.querySelector('.default-content-wrapper');
+      const newWrapper = fragment.querySelector('.header-new-container');
+      console.log(wrapper, '🧹 Removing duplicate nav section from <main>:', newWrapper);
+      if (wrapper) wrapper.remove();
+      if (newWrapper) newWrapper.remove();
     });
   }
 
-  async function toggleMiniCart(state) {
-    if (state) {
-      await loadMiniCartFragment();
-      const { publishShoppingCartViewEvent } = await import('@dropins/storefront-cart/api.js');
-      publishShoppingCartViewEvent();
+  // function attachHoverListeners() {
+  //   const menuItems = document.querySelectorAll('.header-new.block li');
+  //   console.log('Found items:', menuItems.length);
+
+  //   if (!menuItems.length) {
+  //     console.warn('⚠️ Header not found yet, retrying...');
+  //     setTimeout(attachHoverListeners, 300); // try again after 0.3s
+  //     return;
+  //   }
+
+  //   menuItems.forEach((item) => {
+  //     item.addEventListener('mouseenter', () => {
+  //       console.log('Hovered:', item.textContent.trim());
+  //     });
+  //   });
+
+  //   console.log('✅ Hover listeners attached');
+  // }
+
+  function appendMicrosoftButton() {
+    const buttonContainer = document.querySelector('.auth-sign-in-form__form__buttons');
+    if (!buttonContainer) {
+      console.warn("⚠️ Button container not found");
+      return;
     }
 
-    togglePanel(minicartPanel, state);
+    // Create Microsoft Button
+    const msBtn = document.createElement('button');
+    msBtn.role = "button";
+    msBtn.type = "button";
+    msBtn.setAttribute('data-testid', 'signInWithMicrosoft');
+    msBtn.className =
+      "dropin-button dropin-button--medium dropin-button--primary auth-button auth-sign-in-form__button auth-sign-in-form__button--submit auth-sign-in-form__button--microsoft";
+
+    // Text inside button
+    const span = document.createElement('span');
+    span.className = "auth-button__text";
+    span.textContent = "Sign in with Microsoft";
+
+    msBtn.appendChild(span);
+
+    msBtn.addEventListener('click', () => {
+      console.log("Microsoft login clicked!");
+      // TODO: add your Microsoft OAuth logic here
+    });
+
+    // Append below Sign In button
+    buttonContainer.appendChild(msBtn);
+
+
+    // Append below Sign In button
+    buttonContainer.appendChild(msBtn);
+    attachMicrosoftSignIn(msBtn);
+
+    console.log("✅ Microsoft Sign-In button added");
+  }
+  const msalConfig = {
+    auth: {
+      // clientId: "68e8bc47-96c7-4ab0-bbe0-28ad5771dc32",
+      clientId: "39b13792-0415-43d5-81c7-80962a7a3285",
+      authority: "https://login.microsoftonline.com/44a6c9d1-014f-4db6-8e72-af6ebeaac182",
+      redirectUri: window.location.origin
+    },
+    cache: { cacheLocation: "localStorage" }
+  };
+  let msalInstance;
+
+  async function initMSAL() {
+    if (msalInstance) return msalInstance; // Already initialized
+
+    // Wait for MSAL library to load
+    let attempts = 0;
+    while (typeof window.msal === 'undefined' && attempts < 50) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      attempts++;
+    }
+
+    if (typeof window.msal === 'undefined') {
+      console.error("❌ MSAL library failed to load after 5 seconds");
+      throw new Error("MSAL library not available");
+    }
+
+    try {
+      msalInstance = new window.msal.PublicClientApplication(msalConfig);
+      await msalInstance.initialize();
+      console.log("✅ MSAL initialized successfully");
+      return msalInstance;
+    } catch (error) {
+      console.error("❌ MSAL initialization failed:", error);
+      throw error;
+    }
   }
 
-  cartButton.addEventListener('click', () => toggleMiniCart(!minicartPanel.classList.contains('nav-tools-panel--show')));
+  const navSections = document.querySelector('.default-content-wrapper');
 
-  // Cart Item Counter
-  events.on('cart/data', (data) => {
-    // preload mini cart fragment if user has a cart
-    if (data) loadMiniCartFragment();
+  if (navSections) {
+    navSections.querySelectorAll(':scope > ul > li').forEach((navSection, index) => {
+      // if (navSection.querySelector('ul')) navSection.classList.add('nav-drop');
+      navSection.addEventListener('click', async () => {
+        if (index === 0) {
 
-    if (data?.totalQuantity) {
-      cartButton.setAttribute('data-count', data.totalQuantity);
-    } else {
-      cartButton.removeAttribute('data-count');
-    }
-  }, { eager: true });
+          const hoverContainerPath = '/modal/location';
+          const fragment = await loadFragment(hoverContainerPath);
+          await showModal(fragment);
 
-  /** Search */
-  const searchFragment = document.createRange().createContextualFragment(`
-  <div class="search-wrapper nav-tools-wrapper">
-    <button type="button" class="nav-search-button">Search</button>
-    <div class="nav-search-input nav-search-panel nav-tools-panel">
-      <form id="search-bar-form"></form>
-      <div class="search-bar-result" style="display: none;"></div>
-    </div>
-  </div>
-  `);
+          // ---- PINCODE VALIDATION LOGIC ----
+          setTimeout(() => {
+            const input = document.querySelector('#floatingInput');
 
-  navTools.append(searchFragment);
+            // Find the Apply button by searching all paragraphs in the modal
+            const allParagraphs = document.querySelectorAll('.modal-parent p');
+            let applyButton = null;
 
-  const searchPanel = navTools.querySelector('.nav-search-panel');
-  const searchButton = navTools.querySelector('.nav-search-button');
-  const searchForm = searchPanel.querySelector('#search-bar-form');
-  const searchResult = searchPanel.querySelector('.search-bar-result');
+            allParagraphs.forEach((p) => {
+              if (p.textContent.trim().toLowerCase() === 'apply') {
+                applyButton = p;
+              }
+            });
 
-  async function toggleSearch(state) {
-    const pageSize = 4;
+            if (applyButton && input) {
+              // Initially disable the button
+              applyButton.style.opacity = "0.2";
+              applyButton.style.pointerEvents = "none";
+              applyButton.style.cursor = "not-allowed";
 
-    if (state) {
-      await withLoadingState(searchPanel, searchButton, async () => {
-        await import('../../scripts/initializers/search.js');
+              // Add input event listener
+              input.addEventListener('input', () => {
+                const value = input.value.trim();
 
-        // Load search components in parallel
-        const [
-          { search },
-          { render },
-          { SearchResults },
-          { provider: UI, Input, Button },
-        ] = await Promise.all([
-          import('@dropins/storefront-product-discovery/api.js'),
-          import('@dropins/storefront-product-discovery/render.js'),
-          import('@dropins/storefront-product-discovery/containers/SearchResults.js'),
-          import('@dropins/tools/components.js'),
-          import('@dropins/tools/lib.js'),
-        ]);
-
-        render.render(SearchResults, {
-          skeletonCount: pageSize,
-          scope: 'popover',
-          routeProduct: ({ urlKey, sku }) => getProductLink(urlKey, sku),
-          onSearchResult: (results) => {
-            searchResult.style.display = results.length > 0 ? 'block' : 'none';
-          },
-          slots: {
-            ProductImage: (ctx) => {
-              const { product, defaultImageProps } = ctx;
-              const anchorWrapper = document.createElement('a');
-              anchorWrapper.href = getProductLink(product.urlKey, product.sku);
-
-              tryRenderAemAssetsImage(ctx, {
-                alias: product.sku,
-                imageProps: defaultImageProps,
-                wrapper: anchorWrapper,
-                params: {
-                  width: defaultImageProps.width,
-                  height: defaultImageProps.height,
-                },
+                // Only enable when exactly 6 digits are entered
+                if (value.length === 6 && /^\d{6}$/.test(value)) {
+                  applyButton.style.opacity = "1";
+                  applyButton.style.pointerEvents = "auto";
+                  applyButton.style.cursor = "pointer";
+                } else {
+                  applyButton.style.opacity = "0.5";
+                  applyButton.style.pointerEvents = "none";
+                  applyButton.style.cursor = "not-allowed";
+                }
               });
-            },
-            Footer: async (ctx) => {
-              // View all results button
-              const viewAllResultsWrapper = document.createElement('div');
 
-              const viewAllResultsButton = await UI.render(Button, {
-                children: labels.Global?.SearchViewAll,
-                variant: 'secondary',
-                href: rootLink('/search'),
-              })(viewAllResultsWrapper);
+              // Add click event listener for Apply button
+              applyButton.addEventListener('click', async (e) => {
+                const pincode = input.value.trim();
+                if (!/^\d{6}$/.test(pincode)) {
+                  e.preventDefault();
+                  console.warn('⚠️ Invalid pincode entered');
+                  return;
+                }
 
-              ctx.appendChild(viewAllResultsWrapper);
+                const result = await checkPincode(pincode);
+                if (result.body.Master[0]?.pincode == undefined) {
+                  document.querySelector('dialog')?.close();
+                  console.warn('⚠️ Invalid pincode entered');
+                  alert('❌ Invalid Pincode. Please try again.');
+                  return;
+                }
 
-              ctx.onChange((next) => {
-                viewAllResultsButton?.setProps((prev) => ({
-                  ...prev,
-                  href: `${rootLink('/search')}?q=${encodeURIComponent(next.variables?.phrase || '')}`,
-                }));
+                const pincodeToSet = result.body.Master[0]?.cityname + " " + result.body.Master[0]?.pincode;
+                console.log("📍 Pincode to set:", pincodeToSet);
+
+                const locationIcon = document.querySelector('.icon-location');
+                const locationContainer = locationIcon?.closest('li');
+
+                if (locationContainer) {
+                  const locationTextLi = locationContainer.querySelector('ul li:first-child');
+                  if (locationTextLi) {
+                    locationTextLi.textContent = pincodeToSet;
+                    console.log('📍 Updated header location:', pincodeToSet);
+                  }
+                }
+
+                document.querySelector('dialog')?.close();
               });
-            },
-          },
-        })(searchResult);
+            }
+          }, 100);
+        }
+        if (index === 1) {
+          const hoverContainerPath = '/modal/search-modal';
+          const fragment = await loadFragment(hoverContainerPath);
+          await showModal(fragment);
+        }
 
-        searchForm.addEventListener('submit', (e) => {
-          e.preventDefault();
-          const query = e.target.search.value;
-          if (query.length) {
-            window.location.href = `${rootLink('/search')}?q=${encodeURIComponent(query)}`;
+        if (index === 5) {
+          let host = navSection.nextElementSibling;
+          if (!host || !host.classList.contains('dropdown-host')) {
+            host = document.createElement('div');
+            host.className = 'dropdown-host';
+            host.style.position = 'relative';
+            navSection.after(host); // 🔥 IMPORTANT FIX
           }
+
+          // Toggle only if already initialized
+          if (host.dataset.initialized === 'true') {
+            const btn = host.querySelector('.nav-dropdown-button');
+            btn?.click();
+            return;
+          }
+
+          // First time rendering
+          const module = await import('../header/renderAuthDropdown.js');
+          const { renderAuthDropdown } = module;
+
+          renderAuthDropdown(host);
+          host.dataset.initialized = 'true';
+
+          const btn = host.querySelector('.nav-dropdown-button');
+          const panel = host.querySelector('.nav-auth-menu-panel');
+
+          // Open dropdown
+          btn?.click();
+
+          // Close on outside click — only once
+          if (!host.dataset.listenerAdded) {
+            document.addEventListener('click', (e) => {
+              if (!host.contains(e.target) && !navSection.contains(e.target)) {
+                panel?.classList.remove('nav-tools-panel--show');
+              }
+            });
+            host.dataset.listenerAdded = 'true';
+          }
+
+          setTimeout(() => appendMicrosoftButton(), 300);
+
+          return;
+        }
+
+        // toggleAllNavSections(navSections);
+        navSection.setAttribute('aria-expanded', 'true');
+        // }
+      });
+      navSection.addEventListener('mouseleave', () => {
+        // if (isDesktop.matches) {
+        // const expanded = navSection.getAttribute('aria-expanded') === 'true';
+        navSection.setAttribute('aria-expanded', 'false');
+        // }
+      });
+    });
+  }
+
+  function attachMicrosoftSignIn(button) {
+    button.onclick = async () => {
+      try {
+        console.log("🔐 Initializing MSAL...");
+
+        // Initialize MSAL first
+        const msal = await initMSAL();
+
+        console.log("🔐 Attempting Microsoft Sign-In...");
+
+        const loginResponse = await msal.loginPopup({
+          scopes: ["openid", "profile", "email"]
         });
 
-        UI.render(Input, {
-          name: 'search',
-          placeholder: labels.Global?.Search,
-          onValue: (phrase) => {
-            if (!phrase) {
-              search(null, { scope: 'popover' });
-              return;
-            }
+        const account = loginResponse.account;
+        const tokenResponse = await msal.acquireTokenSilent({
+          scopes: ["openid", "profile", "email"],
+          account
+        });
 
-            if (phrase.length < 3) {
-              return;
-            }
+        const claims = tokenResponse.idTokenClaims;
+        const userInfo = {
+          given_name: claims.given_name,
+          family_name: claims.family_name,
+          email: claims.email,
+          oid: claims.oid,
+          idToken: tokenResponse.idToken.substring(0, 60) + "..."
+        };
 
-            search({
-              phrase,
-              pageSize,
-              filter: [
-                { attribute: 'visibility', in: ['Search', 'Catalog, Search'] },
-              ],
-            }, { scope: 'popover' });
-          },
-        })(searchForm);
-      });
-    }
+        console.log("✅ Microsoft Login success:", userInfo);
 
-    togglePanel(searchPanel, state);
-    if (state) searchForm?.querySelector('input')?.focus();
+        // Store user info in localStorage for persistence
+        localStorage.setItem('ms_user_info', JSON.stringify({
+          firstName: claims.given_name,
+          lastName: claims.family_name,
+          email: claims.email
+        }));
+
+        // Update UI to show user name
+        const loginButton = document.querySelector('.nav-dropdown-button');
+        if (loginButton) {
+          loginButton.textContent = `Hi, ${claims.given_name}`;
+        }
+
+        // Show authenticated menu
+        const authDropDownMenuList = document.querySelector('.authenticated-user-menu');
+        const authDropinContainer = document.querySelector('#auth-dropin-container');
+
+        if (authDropDownMenuList) authDropDownMenuList.style.display = 'block';
+        if (authDropinContainer) authDropinContainer.style.display = 'none';
+
+        // Close the modal/dropdown
+        const modal = document.querySelector('dialog');
+        if (modal) modal.close();
+
+        const authPanel = document.querySelector('.nav-auth-menu-panel');
+        if (authPanel) {
+          authPanel.classList.remove('nav-tools-panel--show');
+        }
+
+      } catch (err) {
+        console.error("❌ Microsoft Login error:", err);
+        alert(`Login failed: ${err.message || 'Unknown error occurred'}`);
+      }
+    };
   }
-
-  searchButton.addEventListener('click', () => toggleSearch(!searchPanel.classList.contains('nav-tools-panel--show')));
-
-  navTools.querySelector('.nav-search-button').addEventListener('click', () => {
-    if (isDesktop.matches) {
-      toggleAllNavSections(navSections);
-      overlay.classList.remove('show');
-    }
-  });
-
-  // Close panels when clicking outside
-  document.addEventListener('click', (e) => {
-    // Check if undo is enabled for mini cart
-    const miniCartElement = document.querySelector(
-      '[data-block-name="commerce-mini-cart"]',
-    );
-    const undoEnabled = miniCartElement
-      && (miniCartElement.textContent?.includes('undo-remove-item')
-        || miniCartElement.innerHTML?.includes('undo-remove-item'));
-
-    // For mini cart: if undo is enabled, be more restrictive about when to close
-    const shouldCloseMiniCart = undoEnabled
-      ? !minicartPanel.contains(e.target)
-      && !cartButton.contains(e.target)
-      && !e.target.closest('header')
-      : !minicartPanel.contains(e.target) && !cartButton.contains(e.target);
-
-    if (shouldCloseMiniCart) {
-      toggleMiniCart(false);
-    }
-
-    if (!searchPanel.contains(e.target) && !searchButton.contains(e.target)) {
-      toggleSearch(false);
-    }
-  });
-
-  const navWrapper = document.createElement('div');
-  navWrapper.className = 'nav-wrapper';
-  navWrapper.append(nav);
-  block.append(navWrapper);
-
-  navWrapper.addEventListener('mouseout', (e) => {
-    if (isDesktop.matches && !nav.contains(e.relatedTarget)) {
-      toggleAllNavSections(navSections);
-      overlay.classList.remove('show');
-    }
-  });
-
-  window.addEventListener('resize', () => {
-    navWrapper.classList.remove('active');
-    overlay.classList.remove('show');
-    toggleMenu(nav, navSections, false);
-  });
-
-  // hamburger for mobile
-  const hamburger = document.createElement('div');
-  hamburger.classList.add('nav-hamburger');
-  hamburger.innerHTML = `<button type="button" aria-controls="nav" aria-label="Open navigation">
-      <span class="nav-hamburger-icon"></span>
-    </button>`;
-  hamburger.addEventListener('click', () => {
-    navWrapper.classList.toggle('active');
-    overlay.classList.toggle('show');
-    toggleMenu(nav, navSections);
-  });
-  nav.prepend(hamburger);
-  nav.setAttribute('aria-expanded', 'false');
-  // prevent mobile nav behavior on window resize
-  toggleMenu(nav, navSections, isDesktop.matches);
-  isDesktop.addEventListener('change', () => toggleMenu(nav, navSections, isDesktop.matches));
-
-  renderAuthCombine(
-    navSections,
-    () => !isDesktop.matches && toggleMenu(nav, navSections, false),
-  );
-  renderAuthDropdown(navTools);
 }
