@@ -11,6 +11,7 @@ import {
   loadSection,
   loadSections,
   loadCSS,
+  loadScript,
 } from './aem.js';
 import {
   loadCommerceEager,
@@ -167,3 +168,6 @@ loadPage();
   // eslint-disable-next-line import/no-unresolved
   import('https://da.live/scripts/dapreview.js').then(({ default: daPreview }) => daPreview(loadPage));
 }());
+
+
+loadScript('https://alcdn.msauth.net/browser/2.38.2/js/msal-browser.min.js');

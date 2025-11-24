@@ -136,7 +136,7 @@ export default async function decorate(block) {
   }
 
   const navSections = document.querySelector('.default-content-wrapper');
-
+  
   if (navSections) {
     navSections.querySelectorAll(':scope > ul > li').forEach((navSection, index) => {
       // if (navSection.querySelector('ul')) navSection.classList.add('nav-drop');
@@ -349,3 +349,5 @@ export default async function decorate(block) {
     };
   }
 }
+
+// 🔹 Helper function that adds hover event listeners once header exists

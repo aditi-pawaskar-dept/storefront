@@ -1,0 +1,106 @@
+/* body {
+    background-color: black;
+} */
+
+/* .sec-footer>div {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+}
+
+.sec-footer {
+    background-color: black;
+}
+
+.sec-footer>div>div>p {
+    color: #fff;
+    font-family: robotoRegular, sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 16px;
+}
+
+.sec-footer>div>div>ul {
+    display: flex;
+    flex-direction: row;
+    gap: 24px;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 400px;
+    list-style-type: none;
+    padding: 0;
+    color: #fff;
+}
+
+.sec-footer>div>div:nth-child(2) {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 20px;
+}
+
+.sec-footer>div>div>p>a.button {
+    background-color: black;
+    padding: 0;
+}
+
+.sec-footer>div>div>p>a>span {
+    height: 40px;
+    width: 135px;
+}
+
+.section>div>h4,
+.section>div>ul {
+    background-color: black;
+}
+
+.section>div>h4>strong {
+    color: #fff;
+    font-family: robotoRegular, sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 16px;
+    position: relative;
+}
+
+.section>div>ul {
+    display: flex;
+    flex-wrap: wrap;
+    list-style-type: none;
+    justify-content: flex-start;
+    padding: 0;
+    margin: 0;
+}
+
+.section>div>ul>li>p>a.button {
+    margin: 0;
+    padding: 0;
+    background-color: black;
+    font-size: 12px;
+}
+
+.section>div>ul>li>a {
+    font-size: 12px;
+}
+
+.section>div>ul>li>a:hover {
+    text-decoration: none;
+    color: #454545
+}
+
+.section>div>ul>li {
+    position: relative;
+    padding: 0 9px 0 5px;
+    font-size: 12px;
+}
+
+.section>div>ul>li>p {
+    margin: 0;
+}
+
+.section>div>ul>li:not(:last-child)::after {
+    content: "|";
+    position: absolute;
+    right: 0;
+    color: #7b7b7b;
+} */
