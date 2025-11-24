@@ -10,8 +10,12 @@ export default async function createModal(contentNodes) {
   const dialogContent = document.createElement('div');
   dialogContent.classList.add('modal-content');
   dialogContent.append(...contentNodes);
+  
+
+  
   dialog.append(dialogContent);
 
+  // Close button
   const closeButton = document.createElement('button');
   closeButton.classList.add('close-button');
   closeButton.setAttribute('aria-label', 'Close');
@@ -22,22 +26,19 @@ export default async function createModal(contentNodes) {
   dialog.append(closeButton);
 
   const closeModal = () => {
-    // close the dialog
     dialog.close();
-    // unmount any dropin containers rendered in the modal
     dialog.querySelectorAll('[data-dropin-container]').forEach(Render.unmount);
   };
 
-  // close dialog on clicks outside the dialog. https://stackoverflow.com/a/70593278/79461
+  // Close modal on outside click
   dialog.addEventListener('click', (event) => {
     if (event.pointerType !== 'mouse') return;
-
-    const dialogDimensions = dialog.getBoundingClientRect();
+    const rect = dialog.getBoundingClientRect();
     if (
-      event.clientX < dialogDimensions.left
-      || event.clientX > dialogDimensions.right
-      || event.clientY < dialogDimensions.top
-      || event.clientY > dialogDimensions.bottom
+      event.clientX < rect.left ||
+      event.clientX > rect.right ||
+      event.clientY < rect.top ||
+      event.clientY > rect.bottom
     ) {
       closeModal();
     }
@@ -58,13 +59,10 @@ export default async function createModal(contentNodes) {
     removeModal: () => closeModal(),
     showModal: () => {
       dialog.showModal();
-      // Google Chrome restores the scroll position when the dialog is reopened,
-      // so we need to reset it.
       setTimeout(() => {
         dialogContent.scrollTop = 0;
       }, 0);
 
-      // Focus the first input when content is fully loaded using MutationObserver.
       const observer = new MutationObserver(() => {
         const firstInput = dialogContent.querySelector('input');
         if (firstInput) {
@@ -74,7 +72,6 @@ export default async function createModal(contentNodes) {
       });
 
       observer.observe(dialogContent, { childList: true, subtree: true });
-
       document.body.classList.add('modal-open');
     },
   };

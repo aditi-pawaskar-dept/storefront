@@ -1,81 +1,210 @@
+/* prevent scroll when modal open */
 body.modal-open {
     overflow: hidden;
 }
 
+/* ===========================
+   DIALOG BASE
+   =========================== */
 .modal dialog {
-    --dialog-border-radius: var(--shape-border-radius-2);
-
-    overscroll-behavior: none;
-    border: var(--shape-border-width-1) solid var(--color-neutral-400);
+    --dialog-border-radius: 12px;
+    border: none;
     border-radius: var(--dialog-border-radius);
-    width: 100vw;
+    max-width: 400px;
+    width: 90%;
+    margin: auto;
+    background: #fff;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+    position: relative;
+
+    /* tightly control spacing */
+    /* padding: 12px 20px 28px; */
+    /* reduced top and side padding */
 }
 
-.modal dialog .modal-content {
-    overflow-y: auto;
-    overscroll-behavior: none;
-    max-height: calc(100dvh - 60px);
-}
-
-.modal dialog::backdrop {
-    background-color: rgb(0 0 0 / 50%);
-}
-
+/* ===========================
+   CLOSE BUTTON
+   =========================== */
 .modal .close-button {
     position: absolute;
-    top: 0;
-    right: 0;
-    width: 48px;
-    height: 48px;
-    margin: 0;
+    top: 6px;
+    /* bring closer to white border */
+    right: 6px;
+    /* minimal gap from right */
+    width: 32px;
+    height: 32px;
+    background: transparent;
     border: none;
-    border-radius: 0;
+    cursor: pointer;
     padding: 0;
-    background-color: transparent;
-    color: var(--color-brand-600);
-    line-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .modal .close-button .icon.icon-close {
-    content: "";
-    width: 24px;
-    height: 24px;
+    width: 18px;
+    height: 18px;
+    position: relative;
 }
 
 .modal .close-button .icon.icon-close::before,
 .modal .close-button .icon.icon-close::after {
     content: "";
-    box-sizing: border-box;
-    display: block;
     position: absolute;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%) rotate(45deg);
-    width: 24px;
+    width: 18px;
     height: 2px;
-    border-radius: var(--shape-border-radius-1);
-    background-color: currentcolor;
+    background: #222;
+    transform-origin: center;
+    border-radius: 2px;
+}
+
+.modal .close-button .icon.icon-close::before {
+    transform: translate(-50%, -50%) rotate(45deg);
 }
 
 .modal .close-button .icon.icon-close::after {
     transform: translate(-50%, -50%) rotate(-45deg);
 }
 
-.modal .close-button span {
+/* ===========================
+   CONTENT WRAPPER
+   =========================== */
+.modal .modal-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    overflow: visible;
+    gap: 14px;
+    padding-top: 0;
+    /* remove top gap entirely */
+}
+
+/* ===========================
+   DEFAULT CONTENT
+   =========================== */
+.modal .default-content-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    /* margin-bottom: 28px; */
+}
+
+.modal .default-content-wrapper .icon.icon-location {
+    /* width: 60px;
+    height: 60px; */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal .default-content-wrapper .icon.icon-location img {
+    width: 27px !important;
+    height: 31px !important;
+}
+
+/* title */
+.modal .default-content-wrapper p:nth-of-type(2) {
+    font-size: 18px;
+    font-weight: 600;
+    color: #222;
+    margin: 6px 0 4px;
+}
+
+/* subtitle */
+.modal .default-content-wrapper p:nth-of-type(3) {
+    font-size: 14px;
+    color: #6e6e6e;
+    margin: 0;
+    line-height: 1.6;
+    max-width: 260px;
+}
+
+/* ===========================
+   INPUT & BUTTON
+   =========================== */
+.modal .location-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 30px;
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+/* floating input */
+.modal .floating-input {
+    position: relative;
+    width: 100%;
+    /* full width for natural centering */
+    max-width: 320px;
+    /* cap width so it doesn’t stretch too wide */
+    display: flex;
+    justify-content: center;
+}
+
+.modal .floating-input input {
+    width: 100%;
+    padding: 14px 14px 10px;
+    font-size: 15px;
+    border: 1px solid #dcdcdc;
+    border-radius: 6px;
+    background-color: #fff;
+    outline: none;
+    transition: border-color 0.2s ease;
+    text-align: left;
+}
+
+.modal .floating-input input:focus {
+    border-color: #000;
+}
+
+.modal .floating-input label {
+    position: absolute;
+    top: 50%;
+    left: 16px;
+    transform: translateY(-50%);
+    color: #8c8c8c;
+    font-size: 15px;
+    background-color: #fff;
+    padding: 0 4px;
+    pointer-events: none;
+    transition: all 0.2s ease;
+}
+
+/* label float */
+.modal .floating-input input:focus+label,
+.modal .floating-input.has-value label {
+    top: -6px;
+    font-size: 12px;
+    color: #000;
+}
+
+/* apply button */
+.modal .location-btn {
+    width: 120px;
+    padding: 10px 0;
+    font-size: 16px;
+    border: none;
+    border-radius: 50px;
+    background-color: #e0e0e0;
+    color: #fff;
+    cursor: not-allowed;
+    transition: background-color 0.3s ease;
+    align-self: center;
+    /* keep perfectly centered */
+}
+
+.modal .location-btn.active {
+    background-color: #000;
     cursor: pointer;
 }
 
-.modal dialog .section {
-    padding: 0;
-}
-
-@media (min-width: 600px) {
-    .modal dialog {
-        width: 80vw;
-        max-width: 700px;
-    }
-
-    .modal dialog .modal-content {
-        max-height: calc(100vh - 90px);
-    }
+.modal .location-btn.active:hover {
+    background-color: #111;
 }
